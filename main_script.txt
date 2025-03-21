@@ -1,0 +1,73 @@
+#include <Arduino.h>
+#include "DHT.h"
+#include <LiquidCrystal_I2C.h>
+
+// Pin Definitions
+const int relayPin = 5;      // 25 Relay connected to GPIO 25 (D25)
+const int dhtPin = 23;       // 2 DHT connected to GPIO 2 (D2)
+const int soilMoisturePin = 4; // 18 Soil Moisture connected to GPIO 18 (D18)
+
+// DHT Sensor Setup
+#define DHTTYPE DHT11
+DHT dht(dhtPin, DHTTYPE);
+
+// LCD Setup
+LiquidCrystal_I2C lcd(0x27, 16, 2); // LCD address is 0x27
+
+void setup() {
+  Serial.begin(115200);
+
+  // Relay Setup
+  pinMode(relayPin, OUTPUT);
+  digitalWrite(relayPin, LOW);
+
+  // DHT Setup
+  dht.begin();
+
+  // LCD Setup
+  lcd.init();
+  lcd.backlight();
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Starting...");
+  lcd.display();
+}
+
+void loop() {
+  // Read DHT Sensor
+  float humidity = dht.readHumidity();
+  float temperature = dht.readTemperature();
+
+  // Read Soil Moisture Sensor
+  int soilMoistureValue = analogRead(soilMoisturePin);
+
+  // Control Relay (Example: Turn on if soil is dry)
+  if (soilMoistureValue < 1000) { // Adjust threshold based on calibration
+    digitalWrite(relayPin, HIGH);
+  } else {
+    digitalWrite(relayPin, LOW);
+  }
+
+  // Display Data on LCD
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Temp: ");
+  lcd.print(temperature);
+  lcd.print(" C");
+
+  lcd.setCursor(0, 1);
+  lcd.print("Soil: ");
+  lcd.print(soilMoistureValue);
+
+  lcd.display();
+
+  // Serial Output for Debugging
+  Serial.print("Humidity: ");
+  Serial.print(humidity);
+  Serial.print(" %, Temperature: ");
+  Serial.print(temperature);
+  Serial.print(" *C, Soil Moisture: ");
+  Serial.println(soilMoistureValue);
+
+  delay(2000); // Adjust delay as needed
+}
