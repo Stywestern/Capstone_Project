@@ -13,8 +13,8 @@ const long  gmtOffset_sec = 3600 * 3; // Adjust for your timezone (Istanbul is G
 const int   daylightOffset_sec = 0;
 
 // Wi-Fi Settings
-const char* ssid = "YavasIntBurda";
-const char* password = "RikiDikiveCucpo";
+const char* ssid = "**********";
+const char* password = "**********";
 WiFiServer server(80);
 
 // ThingSpeak Server Settings
