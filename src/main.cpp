@@ -13,8 +13,8 @@ const long  gmtOffset_sec = 3600 * 3; // Adjust for your timezone (Istanbul is G
 const int   daylightOffset_sec = 0;
 
 // Wi-Fi Settings
-const char* ssid = "VODAFONE_40EB";
-const char* password = "K07022003";
+const char* ssid = "asd";
+const char* password = "asd";
 WiFiServer server(80);
 
 // ThingSpeak Server Settings
@@ -25,8 +25,8 @@ const char * myWriteAPIKey = "C72BBAEET0UFASC6";
 
 // Pin Definitions
 const int relayPin = 26;
-const int dhtPin = 4;
-const int soilMoisturePin = 32;
+const int dhtPin = 23;
+const int soilMoisturePin = 35;
 const int ledPin = 2; 
 
 // DHT Sensor Setup
@@ -37,7 +37,7 @@ DHT dht(dhtPin, DHTTYPE);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 // Timing Variables
-const long thingSpeakInterval = 60000; // 60 seconds in milliseconds
+const long thingSpeakInterval = 28000; // 60 seconds in milliseconds
 unsigned long previousThingSpeakMillis = 0;
 
 void setup() {
@@ -135,7 +135,9 @@ void loop() {
 
     // Read Sensors and Send Data to ThingSpeak
     float humidity = dht.readHumidity();
+    delay(1000);
     float temperature = dht.readTemperature();
+    delay(1000);
     int soilMoistureValue = analogRead(soilMoisturePin);
 
     if (isnan(humidity)) {
@@ -157,7 +159,7 @@ void loop() {
     } else {
       Serial.println("Problem updating channel. HTTP error code " + String(x));
     }
-
+    
     // Display Sensor Data on LCD
     lcd.clear();
     lcd.setCursor(0, 0);
