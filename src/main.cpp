@@ -13,8 +13,8 @@ const long  gmtOffset_sec = 3600 * 3; // Adjust for your timezone (Istanbul is G
 const int   daylightOffset_sec = 0;
 
 // Wi-Fi Settings
-const char* ssid = "asd";
-const char* password = "asd";
+const char* ssid = "YavasIntBurda";
+const char* password = "RikiDikiveCucpo";
 WiFiServer server(80);
 
 // ThingSpeak Server Settings
@@ -40,6 +40,16 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 const long thingSpeakInterval = 28000; // 60 seconds in milliseconds
 unsigned long previousThingSpeakMillis = 0;
 
+// Led Variables
+unsigned long previousLcdSwitchMillis = 0;
+const long lcdSwitchInterval = 4000;  // 4 seconds
+int screenState = 0;
+
+// Sensor data cache (to reuse values between LCD updates)
+float cachedHumidity = 0;
+float cachedTemperature = 0;
+int cachedSoilMoisture = 0;
+
 void setup() {
   // Init monitor
   Serial.begin(115200);
@@ -49,7 +59,7 @@ void setup() {
 
   // Relay Setup
   pinMode(relayPin, OUTPUT);
-  digitalWrite(relayPin, LOW);
+  digitalWrite(relayPin, LOW); // LOW means it is working by the way
 
   // DHT Setup
   dht.begin();
@@ -139,6 +149,7 @@ void loop() {
     float temperature = dht.readTemperature();
     delay(1000);
     int soilMoistureValue = analogRead(soilMoisturePin);
+    
 
     if (isnan(humidity)) {
       humidity = 0;
@@ -150,27 +161,25 @@ void loop() {
       soilMoistureValue = 0;
     }
 
+    // Cache values for LCD use
+    cachedHumidity = isnan(humidity) ? 0 : humidity;
+    cachedTemperature = isnan(temperature) ? 0 : temperature;
+    cachedSoilMoisture = soilMoistureValue;
+
+    // Thingspeak send off
+    String ipStr = WiFi.localIP().toString();
+
     ThingSpeak.setField(1, humidity);
     ThingSpeak.setField(2, temperature);
     ThingSpeak.setField(3, soilMoistureValue);
+    ThingSpeak.setField(4, ipStr);
     int x = ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
     if (x == 200) {
       Serial.println("Channel update successful.");
     } else {
       Serial.println("Problem updating channel. HTTP error code " + String(x));
     }
-    
-    // Display Sensor Data on LCD
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Temp: ");
-    lcd.print(temperature);
-    lcd.print(" C-");
-    lcd.setCursor(0, 1);
-    lcd.print("Soil: ");
-    lcd.print(soilMoistureValue);
-    lcd.display();
-
+      
     // Serial Output
     Serial.print("Humidity: ");
     Serial.print(humidity);
@@ -178,5 +187,31 @@ void loop() {
     Serial.print(temperature);
     Serial.print(" *C, Soil Moisture: ");
     Serial.println(soilMoistureValue);
+
+  }
+
+  // Display Sensor Data on LCD
+  if (millis() - previousLcdSwitchMillis >= lcdSwitchInterval) {
+    previousLcdSwitchMillis = millis();
+    screenState = (screenState + 1) % 2;  // Toggle 0 ↔ 1
+  
+    lcd.clear();
+    if (screenState == 0) {
+      lcd.setCursor(0, 0);
+      lcd.print("Temp: ");
+      lcd.print(cachedTemperature);
+      lcd.print(" C");
+  
+      lcd.setCursor(0, 1);
+      lcd.print("Hum: ");
+      lcd.print(cachedHumidity);
+      lcd.print(" %");
+    } else {
+      lcd.setCursor(0, 0);
+      lcd.print("Soil Moisture:");
+      lcd.setCursor(0, 1);
+      lcd.print(cachedSoilMoisture);
+    }
+    lcd.display();
   }
 }

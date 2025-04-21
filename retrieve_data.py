@@ -28,7 +28,8 @@ def write_to_csv(data, filename="thingspeak_data.csv"):
                     humidity = entry["field1"]
                     temperature = entry["field2"]
                     soil_moisture = entry["field3"]
-                    writer.writerow([time_str, humidity, temperature, soil_moisture])
+                    ip_adress = entry["field4"]
+                    writer.writerow([time_str, humidity, temperature, soil_moisture, ip_adress])
 
     except IOError as e:
         print(f"Error writing to CSV file: {e}")

@@ -1,7 +1,7 @@
 import requests
 import time
 
-esp32_ip = "192.168.1.104"
+esp32_ip = "192.168.1.101"
 
 def send_command(command):
     url = f"http://{esp32_ip}/command?command={command}"
@@ -18,7 +18,7 @@ try:
             print("Sending commands...")
             send_command("led_on")
             send_command("relay_off")
-            time.sleep(5)
+            time.sleep(100)
             send_command("led_off")
             send_command("relay_on")
             time.sleep(5)
