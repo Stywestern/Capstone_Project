@@ -4,6 +4,7 @@
 #include <LiquidCrystal_I2C.h>
 #include <WiFi.h>
 #include <WiFiClient.h>
+#include <HTTPClient.h> 
 #include <WiFiServer.h>
 #include "ThingSpeak.h"
 
@@ -13,8 +14,8 @@ const long  gmtOffset_sec = 3600 * 3; // Adjust for your timezone (Istanbul is G
 const int   daylightOffset_sec = 0;
 
 // Wi-Fi Settings
-const char* ssid = "**********";
-const char* password = "**********";
+const char* ssid = "Galaxy A53 5G 7507";
+const char* password = "hwpx1270";
 WiFiServer server(80);
 
 // ThingSpeak Server Settings
@@ -22,6 +23,9 @@ WiFiClient  client;
 
 unsigned long myChannelNumber = 2887470;
 const char * myWriteAPIKey = "C72BBAEET0UFASC6";
+
+const char* talkbackApiKey = "M19L0E6ZL4XDUVD9";
+const char* talkbackId = "54690";
 
 // Pin Definitions
 const int relayPin = 26;
@@ -37,10 +41,13 @@ DHT dht(dhtPin, DHTTYPE);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 // Timing Variables
-const long thingSpeakInterval = 28000; // 60 seconds in milliseconds
+const long thingSpeakInterval = 20000; // 15 seconds in milliseconds
 unsigned long previousThingSpeakMillis = 0;
 
-// Led Variables
+static unsigned long lastTalkbackCheck = 0;
+const unsigned long talkbackInterval = 20000; // Poll ThingSpeak TalkBack every 15 seconds
+
+// Lcd Variables
 unsigned long previousLcdSwitchMillis = 0;
 const long lcdSwitchInterval = 4000;  // 4 seconds
 int screenState = 0;
@@ -49,6 +56,17 @@ int screenState = 0;
 float cachedHumidity = 0;
 float cachedTemperature = 0;
 int cachedSoilMoisture = 0;
+
+String nowAsString() {
+  time_t now;
+  struct tm timeinfo;
+  time(&now);
+  localtime_r(&now, &timeinfo);
+
+  char buf[20];
+  strftime(buf, sizeof(buf), "%H:%M:%S", &timeinfo);
+  return String(buf);
+}
 
 void setup() {
   // Init monitor
@@ -59,7 +77,7 @@ void setup() {
 
   // Relay Setup
   pinMode(relayPin, OUTPUT);
-  digitalWrite(relayPin, LOW); // LOW means it is working by the way
+  digitalWrite(relayPin, HIGH); // LOW means it is working by the way
 
   // DHT Setup
   dht.begin();
@@ -72,17 +90,31 @@ void setup() {
   lcd.print("Starting...");
   lcd.display();
 
-  // Connect to Wi-Fi
+  lcd.setCursor(0, 1);
+  lcd.print("Connecting WiFi");
+
+  // Wifi section
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
+  Serial.print(WiFi.status());
+
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 10) {
     delay(1000);
     Serial.println("Connecting to WiFi...");
+    lcd.print(".");
+    attempts++;
   }
-  Serial.println("Connected to WiFi");
-  Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP());
 
-  ThingSpeak.begin(client);
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("Connected to WiFi");
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());
+    ThingSpeak.begin(client);
+  } else {
+    Serial.println("WiFi connection failed. Continuing without WiFi.");
+    lcd.setCursor(0, 1);
+    lcd.print("WiFi failed      ");
+  }
 
   // Start Server
   server.begin();
@@ -90,52 +122,58 @@ void setup() {
   digitalWrite(ledPin, LOW); // LED off
 }
 
-void loop() {
-  WiFiClient client = server.available();
-  if (client) {
-    String request = client.readStringUntil('\r');
-    if (request.indexOf("/command?") != -1) {
-      int startIndex = request.indexOf("command=") + 8;
-      int endIndex = request.indexOf(" HTTP/");
-      String command = request.substring(startIndex, endIndex);
 
+void loop() {
+
+  if (WiFi.status() == WL_CONNECTED && millis() - lastTalkbackCheck > talkbackInterval) {
+    lastTalkbackCheck = millis();
+    HTTPClient http;
+    String url = "https://api.thingspeak.com/talkbacks/";
+    url += talkbackId;
+    url += "/commands/execute?api_key=";
+    url += talkbackApiKey;
+  
+    http.begin(url);
+    int httpCode = http.GET();
+  
+    if (httpCode == 200) {
+      String command = http.getString();
+      command.trim();  // Remove newline or whitespace
+
+      Serial.print(nowAsString());
+      Serial.println(" TalkBack command received: " + command);
+  
       if (command == "relay_on") {
         digitalWrite(relayPin, HIGH);
-        client.println("HTTP/1.1 200 OK");
-        client.println("Content-Type: text/plain");
-        client.println("Connection: close");
-        client.println();
-        client.println("Relay ON");
+        Serial.print(nowAsString());
+        Serial.println(" Relay turned ON");
       } else if (command == "relay_off") {
         digitalWrite(relayPin, LOW);
-        client.println("HTTP/1.1 200 OK");
-        client.println("Content-Type: text/plain");
-        client.println("Connection: close");
-        client.println();
-        client.println("Relay OFF");
+        Serial.print(nowAsString());
+        Serial.println(" Relay turned OFF");
       } else if (command == "led_on") {
         digitalWrite(ledPin, HIGH);
-        client.println("HTTP/1.1 200 OK");
-        client.println("Content-Type: text/plain");
-        client.println("Connection: close");
-        client.println();
-        client.println("LED ON");
+        Serial.print(nowAsString());
+        Serial.println(" LED turned ON");
       } else if (command == "led_off") {
         digitalWrite(ledPin, LOW);
-        client.println("HTTP/1.1 200 OK");
-        client.println("Content-Type: text/plain");
-        client.println("Connection: close");
-        client.println();
-        client.println("LED OFF");
+        Serial.print(nowAsString());
+        Serial.println(" LED turned OFF");
+      } else if (command.length() > 0) {
+        Serial.print(nowAsString());
+        Serial.println(" Unknown command: " + command);
       } else {
-        client.println("HTTP/1.1 400 Bad Request");
-        client.println("Content-Type: text/plain");
-        client.println("Connection: close");
-        client.println();
-        client.println("Unknown command");
+        Serial.print(nowAsString());
+        Serial.println(" No new commands.");
       }
+  
+    } else {
+      Serial.print(nowAsString());
+      Serial.print(" Failed to contact TalkBack. HTTP error code: ");
+      Serial.println(httpCode);
     }
-    client.stop();
+  
+    http.end();
   }
 
   // Non-Blocking ThingSpeak Upload
@@ -145,9 +183,9 @@ void loop() {
 
     // Read Sensors and Send Data to ThingSpeak
     float humidity = dht.readHumidity();
-    delay(1000);
+    delay(200);
     float temperature = dht.readTemperature();
-    delay(1000);
+    delay(200);
     int soilMoistureValue = analogRead(soilMoisturePin);
     
 
@@ -172,16 +210,18 @@ void loop() {
     ThingSpeak.setField(1, humidity);
     ThingSpeak.setField(2, temperature);
     ThingSpeak.setField(3, soilMoistureValue);
-    ThingSpeak.setField(4, ipStr);
     int x = ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
     if (x == 200) {
-      Serial.println("Channel update successful.");
+      Serial.print(nowAsString());
+      Serial.println(" Channel update successful.");
     } else {
-      Serial.println("Problem updating channel. HTTP error code " + String(x));
+      Serial.print(nowAsString());
+      Serial.println(" Problem updating channel. HTTP error code " + String(x));
     }
       
     // Serial Output
-    Serial.print("Humidity: ");
+    Serial.print(nowAsString());
+    Serial.print(" Humidity: ");
     Serial.print(humidity);
     Serial.print(" %, Temperature: ");
     Serial.print(temperature);

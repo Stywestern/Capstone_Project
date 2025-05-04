@@ -62,10 +62,10 @@ if __name__ == "__main__":
                     print("Sending commands...")
                     send_command(entry["field4"], "led_on")
                     send_command(entry["field4"], "relay_off")
-                    time.sleep(100)
+                    time.sleep(5)
                     send_command(entry["field4"], "led_off")
                     send_command(entry["field4"], "relay_on")
-                    time.sleep(1)
+                    time.sleep(5)
                 except requests.exceptions.RequestException as e:
                     print(f"Network error: {e}")
                     time.sleep(5) # wait 10 seconds, before retrying.
